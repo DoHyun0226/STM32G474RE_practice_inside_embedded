@@ -6,10 +6,10 @@
 void Initialize_MCU(void) /* initialize STM32G474RE MCU */
 {
     // (1) 명령 캐시 및 데이터 캐시 설정
-    // (2) ART 가속기, 프리페치 버퍼, 웨이트 사이클 설정
-    FLASH->ACR |= 0x7UL<<8;
-    FLASH->ACR &= ~0xFUL;          // LATENCY 필드 클리어 (bit 3:0)
-    FLASH->ACR |= 0x4UL;           // LATENCY = 4 (0100) 세팅
+    // (2) ART 가속기, 프리페치 버퍼, 웨이트(4 waits) 사이클 설정
+    FLASH->ACR |= 0x7UL<<8; // DCEN, ICEN, PRFTEN set
+    FLASH->ACR &= ~(0xFUL); // wait cycle 초기화.
+    FLASH->ACR |= 0x4UL; // 4 waits cycle 설정
 
     // (3) HSE 및 PLL 설정(시스템 클록 SYSCLK = 170MHz)
     RCC->CR |= 0x00010100; // HSE on, HSI on
@@ -17,16 +17,18 @@ void Initialize_MCU(void) /* initialize STM32G474RE MCU */
 
     RCC->CFGR &= ~(0x3UL); // SYSCLK = HSI
     RCC->CFGR |= 0x1UL;
-    while(((RCC->CFGR >> 2) & 0x3UL) != 0x1UL); // wait until SYSCLK = HSI
+    while((RCC->CFGR & 0xCUL) != 0x4UL);// wait until SYSCLK = HSI
 
     //PLL 설정
-    RCC->CR &= ~(0x1<<24); // PLL off
-    RCC->PLLCFGR = 0x09403608;  //1001 0100 0000 0011 0110 0000 1000
-    							// HSE 16MHz를 8로 나눠서 2MHz를 만듬 --> PLL 내부의 VCO회로가 1~2MHz에서 안정적
-    							// 2MHz에 216을 곱해서 432MHz --> 다시 2로 나눠서 216MHz 클럭을 생성
-    							// SYSCLK = HSE*PLLN/PLLM/PLLP = 16MHz*216/8/2 = 216MHz
-                                // PLL48CK = HSE*PLLN/PLLM/PLLQ = 16MHz*216/8/9 = 48MHz
-    RCC->CR = 0x01010001; // PLL on, HSE on, HSI on
+    RCC->CR &= ~(0x1UL<<24);// PLL off
+    while(RCC->CR & (0x1UL<<25));   // PLLRDY==0 대기
+    RCC->PLLCFGR &= ~(0x07007FF3UL);
+    RCC->PLLCFGR |= 0x01005553UL;
+    //1001 0100 0000 0011 0110 0000 1000
+	// HSE 24MHz를 6로 나눠서 4MHz를 만듬
+	// 4MHz에 85을 곱해서 340MHz --> 다시 2로 나눠서 170MHz 클럭을 생성
+	// SYSCLK = HSE*PLLM/PLLN/PLLR = 24MHz/6*85/2 = 170MHz
+    RCC->CR |= 0x1UL<<24;// PLL off
     while((RCC->CR & 0x02000000) == 0); // wait until PLLRDY = 1
 
     // (4) 오버드라이브 설정

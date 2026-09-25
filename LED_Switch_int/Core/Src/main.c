@@ -1,175 +1,151 @@
-/* USER CODE BEGIN Header */
-/**
-  ******************************************************************************
-  * @file           : main.c
-  * @brief          : Main program body
-  ******************************************************************************
-  * @attention
-  *
-  * Copyright (c) 2026 STMicroelectronics.
-  * All rights reserved.
-  *
-  * This software is licensed under terms that can be found in the LICENSE file
-  * in the root directory of this software component.
-  * If no LICENSE file comes with this software, it is provided AS-IS.
-  *
-  ******************************************************************************
-  */
-/* USER CODE END Header */
-/* Includes ------------------------------------------------------------------*/
-#include "main.h"
+#include "stm32g474xx.h"
 
-/* Private includes ----------------------------------------------------------*/
-/* USER CODE BEGIN Includes */
 
-/* USER CODE END Includes */
+void Initialize_MCU(void) /* initialize STM32G474RE MCU */
+{
+    // (1) 명령 캐시 및 데이터 캐시 설정
+    // (2) ART 가속기, 프리페치 버퍼, 웨이트(4 waits) 사이클 설정
+    FLASH->ACR |= 0x7UL<<8; // bit 10:8 DCEN, ICEN, PRFTEN set (리셋 시 ICEN은 이미 1)
+    FLASH->ACR &= ~(0xFUL); // bit 3:0 LATENCY 초기화
+    FLASH->ACR |= 0x4UL; // 4 waits cycle — boost 모드 136~170MHz 구간
 
-/* Private typedef -----------------------------------------------------------*/
-/* USER CODE BEGIN PTD */
 
-/* USER CODE END PTD */
+// 캐시를 사용해 코드 실행속도 향상
+//-------------------------------------------------------------
 
-/* Private define ------------------------------------------------------------*/
-/* USER CODE BEGIN PD */
 
-/* USER CODE END PD */
 
-/* Private macro -------------------------------------------------------------*/
-/* USER CODE BEGIN PM */
+    // (3) HSE 및 PLL 설정(시스템 클록 SYSCLK = 170MHz)
+    RCC->CR |= 0x00010100; // bit 16 HSEON, bit 8 HSION
+    while((RCC->CR & 0x00000400) == 0); // wait until HSIRDY(bit 10) = 1
 
-/* USER CODE END PM */
+    RCC->CFGR &= ~(0x3UL); // SYSCLK = HSI
+    RCC->CFGR |= 0x1UL;    // bit 1:0 SW = 01 (HSI16)
+    while((RCC->CFGR & 0xCUL) != 0x4UL);// wait until SWS(bit 3:2) = 01, SYSCLK = HSI
+    while(!(RCC->CR & (0x1UL<<17)));   // HSERDY — 크리스털 발진 안정까지 약 2ms
 
-/* Private variables ---------------------------------------------------------*/
+    //PLL 설정
+    RCC->CR &= ~(0x1UL<<24);// PLL off (PLL 파라미터는 PLL이 꺼져 있어야 변경 가능)
+    while(RCC->CR & (0x1UL<<25));   // PLLRDY==0 대기
+    RCC->PLLCFGR &= ~(0x07007FF3UL); // PLLR/PLLREN/PLLN/PLLM/PLLSRC 필드 클리어
+    RCC->PLLCFGR |= 0x01005553UL;    // PLLSRC=11(HSE), PLLM=5(/6), PLLN=85, PLLREN=1, PLLR=00(/2)
+	// HSE 24MHz를 6으로 나눠서 4MHz를 만듦 (PLL 입력 허용 범위 2.66~16MHz)
+	// 4MHz에 85를 곱해서 340MHz(VCO, 허용 96~344MHz) --> 다시 2로 나눠서 170MHz 생성
+	// SYSCLK = HSE / PLLM * PLLN / PLLR = 24MHz / 6 * 85 / 2 = 170MHz
+    RCC->CR |= 0x1UL<<24;// PLL on
+    while(!(RCC->CR & (0x1UL<<25))); // wait until PLLRDY = 1
 
-/* USER CODE BEGIN PV */
 
-/* USER CODE END PV */
 
-/* Private function prototypes -----------------------------------------------*/
-void SystemClock_Config(void);
-/* USER CODE BEGIN PFP */
 
-/* USER CODE END PFP */
+/*
+ * HSE, HSI 모두 On
+ * HSI 안정 확인 후 임시로 HSI를 SYSCLK로 사용
+ * While문으로 SYSCLK 전환 완료 확인
+ * HSE 안정 확인
+ * HSE, HSI On 유지한 채로 PLL 설정
+ * HSE를 PLL 입력으로 사용해 170MHz 생성 (SYSCLK 전환은 (5)에서)
+ * PLL lock 대기
+ */
+//---------------------------------------------------------------------
 
-/* Private user code ---------------------------------------------------------*/
-/* USER CODE BEGIN 0 */
 
-/* USER CODE END 0 */
 
-/**
-  * @brief  The application entry point.
-  * @retval int
-  */
+    // (4) Boost 모드 설정 (F4/F7의 오버드라이브에 해당)
+    // Range 1 normal 모드에서 STM32G474의 최대 속도는 150MHz
+    // 170MHz를 위해서 boost 모드 설정 --> MCU 내부 전압 레귤레이터 출력을 1.2V에서 1.28V로 높임
+
+    RCC->APB1ENR1 |= 0x1UL<<28; // PWR 주변장치 클록(PWREN = 1), PWR 레지스터에 읽기/쓰기가 가능해짐
+    (void)RCC->APB1ENR1;            // 쓰기 완료 대기 (APB 브리지 지연)
+    PWR->CR1 = (PWR->CR1 & ~(0x3UL << 9)) | (0x1UL << 9); // bit 10:9 VOS = 01, Range 1 (리셋 기본값)
+    //                       ↑ 해당 필드만 0으로 밀고      ↑ 원하는 값 넣기
+    PWR->CR5 &= ~(0x1UL<<8); // bit 8 R1MODE = 0 → boost mode (논리 반대 주의)
+    // 전압 설정 완료 (170MHz 동작 준비). PLL은 켜졌지만 SYSCLK은 아직 HSI16 16MHz
+
+/*
+ * 170MHz 사용 위해선 내부 LDO 전압을 더 높여서 사용해야 함
+ * 대신 소비 전류가 증가
+ * boost 완료를 알리는 플래그가 없어 폴링 불가 — 아래 설정들이 시간을 벌어줌
+ */
+
+//--------------------------------------------------------
+
+    // (5) 시스템/주변장치 클록 설정 (AHB = APB1 = APB2 = 170MHz)
+    // G4는 APB1/APB2 모두 170MHz까지 가능하므로 분주하지 않음
+    // bit 13:11 PPRE2 = 000 → APB2 = HCLK = 170MHz
+    // bit 10:8  PPRE1 = 000 → APB1 = HCLK = 170MHz
+    // bit  7:4  HPRE  = 0000 → AHB  = SYSCLK = 170MHz
+    // bit  1:0  SW    = 11  → SYSCLK 소스를 PLL로 선택
+    RCC->CFGR = (RCC->CFGR & ~0x3FFFUL) | 0x3UL;
+    while((RCC->CFGR & 0xCUL) != 0xCUL);   // SWS(bit 3:2) = 11, PLL 전환 완료까지 대기
+    // ↑ 여기서부터 실제로 CPU가 170MHz로 동작
+    // CSS(Clock Security System) on — HSE 고장 시 HSI16 자동 전환 + NMI 발생
+    RCC->CR |= 0x1UL<<19; // bit 19 CSSON = 1 (set-only, 리셋으로만 해제)
+
+
+
+
+    // (6) SYSCFG 클록 — EXTI 설정 시 필요 (현재 미사용)
+    RCC->APB2ENR |= 0x1UL; // bit 0 SYSCFGEN
+}
+
+/* ───── GPIO & EXTI 초기화 ───── */
+void GPIO_EXTI_Init(void)
+{
+    /* 1) GPIOA 클록 ON (bit0), GPIOC 클록 ON (bit2)*/
+	RCC->AHB2ENR |= 0x00000001;
+	RCC->AHB2ENR |= 0x00000004;
+
+    // 2) PA5을 General-purpose output 모드로 설정 (MODER5[1:0] = 01)
+	GPIOA->MODER &= ~(3UL << 10);  // clear bits 11:10
+	GPIOA->MODER |= 1UL << 10;  // set bit 10
+
+    // 3) PA5 중간 속도 설정 (OSPEEDR5[1:0] = 01)
+	GPIOA->OSPEEDR &= ~(3UL << 10);  // clear bits 11:10
+	GPIOA->OSPEEDR |= 1UL << 10;  // set bit 10
+
+	/* PA5번 LED OFF(Low)로 초기화 */
+	GPIOA->ODR &= ~(1UL << 5); // // OD5출력을 0로 설정-->LED off
+
+    /* ── PC13 : 스위치 입력 / EXTI15_10 ───────────────────── */
+	GPIOC->MODER &= ~(0x3UL<<2*13);   // bits27:26 = 00 (Input)
+
+    /* 4) SYSCFG 클록 ON (EXTI 라우팅용) */
+    RCC->APB2ENR |= 0x1UL;    // SYSCFGEN
+
+    /* 35) EXTI13 소스 = Port C/EXTIR[3]:EXTICR4 - EXTICR 구조체 들어가서 offset 가지고 확인해봐*/
+    SYSCFG->EXTICR[3] &= ~(0xFUL<<4); // clear EXTI13 bits
+    SYSCFG->EXTICR[3] |= (0x1UL<<5); // bit 7:4 0010
+
+    /* 6) EXTI13 Falling-edge 인터럽트 설정 */
+    EXTI->IMR1 |= (0x1UL<<13); // Interrupt request from Line 13 is unmasked
+    EXTI->FTSR1 |= (0x1UL<<13);      // Falling trigger event configuration bit of line 13-->falling trigger enable for input line
+    EXTI->PR1 &= 0x1UL<<13;         // Pending bit clear
+
+    /* 7) NVIC: EXTI13 IRQ Enable */
+    NVIC_EnableIRQ(EXTI15_10_IRQn);
+}
+
+/* ───── EXTI15_10_IRQn 인터럽트 서비스 루틴 (개선 필요) ───── */
+// 문제: 인터럽트 핸들러 내에서 긴 지연은 좋지 않음
+void EXTI15_10_IRQHandler(void)
+{
+    if (EXTI->PR1 & 0x1UL<<13)     // 펜딩 확인
+    {
+        EXTI->PR1 &= 0x1UL<<13;     // 펜딩 클리어
+        // 토글 방식으로 개선
+        GPIOA->ODR ^= 0x1UL<<5;  // LED 토글
+    }
+}
+
+/* ───── main ───── */
 int main(void)
 {
+    Initialize_MCU();  // 170 MHz 클록 설정
+    GPIO_EXTI_Init();  // GPIO 및 EXTI 설정
 
-  /* USER CODE BEGIN 1 */
-
-  /* USER CODE END 1 */
-
-  /* MCU Configuration--------------------------------------------------------*/
-
-  /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
-  HAL_Init();
-
-  /* USER CODE BEGIN Init */
-
-  /* USER CODE END Init */
-
-  /* Configure the system clock */
-  SystemClock_Config();
-
-  /* USER CODE BEGIN SysInit */
-
-  /* USER CODE END SysInit */
-
-  /* Initialize all configured peripherals */
-  /* USER CODE BEGIN 2 */
-
-  /* USER CODE END 2 */
-
-  /* Infinite loop */
-  /* USER CODE BEGIN WHILE */
-  while (1)
-  {
-    /* USER CODE END WHILE */
-
-    /* USER CODE BEGIN 3 */
-  }
-  /* USER CODE END 3 */
+    while (1)
+    {
+        /* 메인 루프는 대기만; 모든 일은 인터럽트에서 처리 */
+    }
 }
-
-/**
-  * @brief System Clock Configuration
-  * @retval None
-  */
-void SystemClock_Config(void)
-{
-  RCC_OscInitTypeDef RCC_OscInitStruct = {0};
-  RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
-
-  /** Configure the main internal regulator output voltage
-  */
-  HAL_PWREx_ControlVoltageScaling(PWR_REGULATOR_VOLTAGE_SCALE1);
-
-  /** Initializes the RCC Oscillators according to the specified parameters
-  * in the RCC_OscInitTypeDef structure.
-  */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
-  RCC_OscInitStruct.HSIState = RCC_HSI_ON;
-  RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
-  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_NONE;
-  if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
-  {
-    Error_Handler();
-  }
-
-  /** Initializes the CPU, AHB and APB buses clocks
-  */
-  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
-                              |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
-  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_HSI;
-  RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
-  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
-  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
-
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_0) != HAL_OK)
-  {
-    Error_Handler();
-  }
-}
-
-/* USER CODE BEGIN 4 */
-
-/* USER CODE END 4 */
-
-/**
-  * @brief  This function is executed in case of error occurrence.
-  * @retval None
-  */
-void Error_Handler(void)
-{
-  /* USER CODE BEGIN Error_Handler_Debug */
-  /* User can add his own implementation to report the HAL error return state */
-  __disable_irq();
-  while (1)
-  {
-  }
-  /* USER CODE END Error_Handler_Debug */
-}
-#ifdef USE_FULL_ASSERT
-/**
-  * @brief  Reports the name of the source file and the source line number
-  *         where the assert_param error has occurred.
-  * @param  file: pointer to the source file name
-  * @param  line: assert_param error line source number
-  * @retval None
-  */
-void assert_failed(uint8_t *file, uint32_t line)
-{
-  /* USER CODE BEGIN 6 */
-  /* User can add his own implementation to report the file name and line number,
-     ex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
-  /* USER CODE END 6 */
-}
-#endif /* USE_FULL_ASSERT */

@@ -1,6 +1,6 @@
 #include "stm32g474xx.h" //CMSIS 디바이스 헤더
 
-uint8_t Test = 0; // 8bit unsigned int
+volatile uint8_t Test = 0; // 8bit unsigned int
 
 int main(void)
 {

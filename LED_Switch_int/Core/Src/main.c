@@ -5,7 +5,7 @@ void Initialize_MCU(void) /* initialize STM32G474RE MCU */
 {
     // (1) 명령 캐시 및 데이터 캐시 설정
     // (2) ART 가속기, 프리페치 버퍼, 웨이트(4 waits) 사이클 설정
-    FLASH->ACR |= 0x7UL<<8; // bit 10:8 DCEN, ICEN, PRFTEN set (리셋 시 ICEN은 이미 1)
+    FLASH->ACR |= 0x7UL<<8; // bit 10:8 DCEN, ICEN, PRFTEN set (리셋값 0x0004_0600 — ICEN, DCEN은 이미 1이라 실제로 켜지는 건 PRFTEN)
     FLASH->ACR &= ~(0xFUL); // bit 3:0 LATENCY 초기화
     FLASH->ACR |= 0x4UL; // 4 waits cycle — boost 모드 136~170MHz 구간
 
@@ -19,10 +19,10 @@ void Initialize_MCU(void) /* initialize STM32G474RE MCU */
     RCC->CR |= 0x00010100; // bit 16 HSEON, bit 8 HSION
     while((RCC->CR & 0x00000400) == 0); // wait until HSIRDY(bit 10) = 1
 
-    RCC->CFGR &= ~(0x3UL); // SYSCLK = HSI
+    RCC->CFGR &= ~(0x3UL); // SW 필드 클리어 (이 순간 SW = 00, G4에서는 reserved 값)
     RCC->CFGR |= 0x1UL;    // bit 1:0 SW = 01 (HSI16)
     while((RCC->CFGR & 0xCUL) != 0x4UL);// wait until SWS(bit 3:2) = 01, SYSCLK = HSI
-    while(!(RCC->CR & (0x1UL<<17)));   // HSERDY — 크리스털 발진 안정까지 약 2ms
+    while(!(RCC->CR & (0x1UL<<17)));   // HSERDY(bit 17) — HSE(온보드 24MHz 오실레이터) 안정 대기. 오실레이터면 원칙상 HSEBYP=1 (현재 미설정)
 
     //PLL 설정
     RCC->CR &= ~(0x1UL<<24);// PLL off (PLL 파라미터는 PLL이 꺼져 있어야 변경 가능)
@@ -65,7 +65,9 @@ void Initialize_MCU(void) /* initialize STM32G474RE MCU */
 /*
  * 170MHz 사용 위해선 내부 LDO 전압을 더 높여서 사용해야 함
  * 대신 소비 전류가 증가
- * boost 완료를 알리는 플래그가 없어 폴링 불가 — 아래 설정들이 시간을 벌어줌
+ * Range 1 안에서 R1MODE만 바꿀 때는 완료 플래그가 없어 폴링 불가
+ * 아래 설정들이 시간을 벌어주긴 하지만 보장된 것은 아님 —
+ * RM0440 절차는 AHB ÷2 상태로 PLL 전환 후 1us 이상 대기, 그다음 ÷1로 복귀
  */
 
 //--------------------------------------------------------
@@ -85,7 +87,7 @@ void Initialize_MCU(void) /* initialize STM32G474RE MCU */
 
 
 
-    // (6) SYSCFG 클록 — EXTI 설정 시 필요 (현재 미사용)
+    // (6) SYSCFG 클록 — EXTI 설정 시 필요 (이 프로젝트에서 EXTI13 라우팅에 사용)
     RCC->APB2ENR |= 0x1UL; // bit 0 SYSCFGEN
 }
 
@@ -113,7 +115,7 @@ void GPIO_EXTI_Init(void)
     /* 4) SYSCFG 클록 ON (EXTI 라우팅용) */
     RCC->APB2ENR |= 0x1UL;    // SYSCFGEN
 
-    /* 35) EXTI13 소스 = Port C/EXTIR[3]:EXTICR4 - EXTICR 구조체 들어가서 offset 가지고 확인해봐*/
+    /* 5) EXTI13 소스 = Port C / EXTICR[3]:EXTICR4 - EXTICR 구조체 들어가서 offset 가지고 확인해봐*/
     SYSCFG->EXTICR[3] &= ~(0xFUL<<4); // clear EXTI13 bits
     SYSCFG->EXTICR[3] |= (0x1UL<<5); // bit 7:4 0010
 
@@ -122,12 +124,12 @@ void GPIO_EXTI_Init(void)
     EXTI->FTSR1 |= (0x1UL<<13);      // Falling trigger event configuration bit of line 13-->falling trigger enable for input line
     EXTI->PR1 &= 0x1UL<<13;         // Pending bit clear
 
-    /* 7) NVIC: EXTI13 IRQ Enable */
-    NVIC_EnableIRQ(EXTI15_10_IRQn);
+    /* 7) NVIC: EXTI15_10 IRQ Enable (EXTI 10~15번 라인 공용) */
+    NVIC_EnableIRQ(EXTI15_10_IRQn); // EXTI15_10_IRQn = 40
 }
 
-/* ───── EXTI15_10_IRQn 인터럽트 서비스 루틴 (개선 필요) ───── */
-// 문제: 인터럽트 핸들러 내에서 긴 지연은 좋지 않음
+/* ───── EXTI15_10_IRQn 인터럽트 서비스 루틴 ───── */
+// 핸들러 안에서 긴 지연 대신 토글만 하고 바로 빠져나오도록 개선한 상태
 void EXTI15_10_IRQHandler(void)
 {
     if (EXTI->PR1 & 0x1UL<<13)     // 펜딩 확인

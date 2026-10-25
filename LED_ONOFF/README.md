@@ -27,6 +27,9 @@
  - ODR
    - GPIO port output data register
    - RM p357 참고
+ - Test 변수
+   - 디버거 Live Expressions에서 값을 바꿔 LED를 On/Off함 (코드 안에서는 바꾸지 않음)
+   - `volatile`로 선언 — 없으면 최적화 시 컴파일러가 루프 안의 읽기를 생략해 디버거로 바꾼 값이 반영되지 않을 수 있음
 <!-- 
 양식 참고용: 내용 연관 없음
  - 해당 프로젝트는 작성자 본인이 STM32G474RE를 이용해 Baram 유튜브 영상을 따라 실습하는 용도이다. 

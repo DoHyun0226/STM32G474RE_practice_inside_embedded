@@ -27,10 +27,10 @@ void Initialize_MCU(void) /* initialize STM32G474RE MCU */
     RCC->CR |= 0x00010100; // bit 16 HSEON, bit 8 HSION
     while((RCC->CR & 0x00000400) == 0); // wait until HSIRDY(bit 10) = 1
 
-    RCC->CFGR &= ~(0x3UL); // SYSCLK = HSI
+    RCC->CFGR &= ~(0x3UL); // SW 필드 클리어 (이 순간 SW = 00, G4에서는 reserved 값)
     RCC->CFGR |= 0x1UL;    // bit 1:0 SW = 01 (HSI16)
     while((RCC->CFGR & 0xCUL) != 0x4UL);// wait until SWS(bit 3:2) = 01, SYSCLK = HSI
-    while(!(RCC->CR & (0x1UL<<17)));   // HSERDY — 크리스털 발진 안정까지 약 2ms
+    while(!(RCC->CR & (0x1UL<<17)));   // HSERDY(bit 17) — HSE(온보드 24MHz 오실레이터) 안정 대기. 오실레이터면 원칙상 HSEBYP=1 (현재 미설정)
 
     //PLL 설정
     RCC->CR &= ~(0x1UL<<24);// PLL off (PLL 파라미터는 PLL이 꺼져 있어야 변경 가능)
@@ -73,7 +73,9 @@ void Initialize_MCU(void) /* initialize STM32G474RE MCU */
 /*
  * 170MHz 사용 위해선 내부 LDO 전압을 더 높여서 사용해야 함
  * 대신 소비 전류가 증가
- * boost 완료를 알리는 플래그가 없어 폴링 불가 — 아래 설정들이 시간을 벌어줌
+ * Range 1 안에서 R1MODE만 바꿀 때는 완료 플래그가 없어 폴링 불가
+ * 아래 설정들이 시간을 벌어주긴 하지만 보장된 것은 아님 —
+ * RM0440 절차는 AHB ÷2 상태로 PLL 전환 후 1us 이상 대기, 그다음 ÷1로 복귀
  */
 
 //--------------------------------------------------------

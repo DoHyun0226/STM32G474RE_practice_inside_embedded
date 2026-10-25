@@ -7,7 +7,14 @@ void Initialize_MCU(void) /* initialize STM32G474RE MCU */
 {
     // (1) 명령 캐시 및 데이터 캐시 설정
     // (2) ART 가속기, 프리페치 버퍼, 웨이트(4 waits) 사이클 설정
-    FLASH->ACR |= 0x7UL<<8; // bit 10:8 DCEN, ICEN, PRFTEN set (리셋 시 ICEN은 이미 1)
+    FLASH->ACR |= 0x7UL<<8; // bit 10:8 DCEN, ICEN, PRFTEN set (리셋값 0x0004_0600 — ICEN, DCEN은 이미 1이라 실제로 켜지는 건 PRFTEN)
+    /*
+     * PRFTEN(bit 8) : 프리페치 버퍼. CPU가 지금 명령을 실행하는 동안 다음 명령을 미리 읽어 둔다.
+     * ICEN  (bit 9) : 명령어 캐시. 반복문처럼 자주 실행하는 명령을 캐시에 보관해서 플래시를 다시 읽지 않는다.
+     * DCEN  (bit 10): 데이터 캐시. 플래시에 있는 상수 데이터(const 테이블 등)를 캐시에 보관한다.
+     * 이 세 기능을 묶어 ST는 "ART 가속기"라고 부른다. 플래시는 170MHz를 따라가지 못해서
+     * 아래처럼 대기 사이클(LATENCY)을 넣어야 하는데, 그만큼 생기는 손실을 이 기능들이 대부분 메워 준다.
+     */
     FLASH->ACR &= ~(0xFUL); // bit 3:0 LATENCY 초기화
     FLASH->ACR |= 0x4UL; // 4 waits cycle — boost 모드 136~170MHz 구간
 
@@ -21,7 +28,7 @@ void Initialize_MCU(void) /* initialize STM32G474RE MCU */
     RCC->CR |= 0x00010100; // bit 16 HSEON, bit 8 HSION
     while((RCC->CR & 0x00000400) == 0); // wait until HSIRDY(bit 10) = 1
 
-    RCC->CFGR &= ~(0x3UL); // SYSCLK = HSI
+    RCC->CFGR &= ~(0x3UL); // SW 필드 클리어 (이 순간 SW = 00, G4에서는 reserved 값)
     RCC->CFGR |= 0x1UL;    // bit 1:0 SW = 01 (HSI16)
     while((RCC->CFGR & 0xCUL) != 0x4UL);// wait until SWS(bit 3:2) = 01, SYSCLK = HSI
     while(!(RCC->CR & (0x1UL<<17)));   // HSERDY — 크리스털 발진 안정까지 약 2ms
@@ -67,7 +74,9 @@ void Initialize_MCU(void) /* initialize STM32G474RE MCU */
 /*
  * 170MHz 사용 위해선 내부 LDO 전압을 더 높여서 사용해야 함
  * 대신 소비 전류가 증가
- * boost 완료를 알리는 플래그가 없어 폴링 불가 — 아래 설정들이 시간을 벌어줌
+ * Range 1 안에서 R1MODE만 바꿀 때는 완료 플래그가 없어 폴링 불가
+ * 아래 설정들이 시간을 벌어주긴 하지만 보장된 것은 아님 —
+ * RM0440 절차는 AHB ÷2 상태로 PLL 전환 후 1us 이상 대기, 그다음 ÷1로 복귀
  */
 
 //--------------------------------------------------------

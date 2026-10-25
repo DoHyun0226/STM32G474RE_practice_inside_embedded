@@ -22,6 +22,6 @@ AHB = APB1 = APB2 = 170MHz (분주 없음).
 
 ### 참고
 
-- HSE는 크리스탈이 아니라 보드 온보드 24MHz 오실레이터 (UM2505 참고)
+- HSE는 보드 온보드 24MHz 크리스털(X3) — 크리스털이므로 HSEBYP = 0 (UM2505 참고)
 - PLL 입력 허용 범위: 2.66~16MHz, VCO 허용 범위: 96~344MHz
 - 레지스터 상세 비트 필드는 `main.c` 주석 및 Reference Manual(RM0440) 참고

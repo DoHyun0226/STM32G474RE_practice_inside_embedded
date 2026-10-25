@@ -31,7 +31,7 @@ void Initialize_MCU(void) /* initialize STM32G474RE MCU */
     RCC->CFGR &= ~(0x3UL); // SW 필드 클리어 (이 순간 SW = 00, G4에서는 reserved 값)
     RCC->CFGR |= 0x1UL;    // bit 1:0 SW = 01 (HSI16)
     while((RCC->CFGR & 0xCUL) != 0x4UL);// wait until SWS(bit 3:2) = 01, SYSCLK = HSI
-    while(!(RCC->CR & (0x1UL<<17)));   // HSERDY — 크리스털 발진 안정까지 약 2ms
+    while(!(RCC->CR & (0x1UL<<17)));   // HSERDY(bit 17) — HSE(온보드 24MHz 오실레이터) 안정 대기. 오실레이터면 원칙상 HSEBYP=1 (현재 미설정)
 
     //PLL 설정
     RCC->CR &= ~(0x1UL<<24);// PLL off (PLL 파라미터는 PLL이 꺼져 있어야 변경 가능)

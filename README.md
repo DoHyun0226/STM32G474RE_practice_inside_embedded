@@ -12,12 +12,12 @@ Nucleo-G474RE 보드로 STM32 레지스터/HAL을 실습하는 저장소이다. 
 | 폴더 | 내용 |
 |---|---|
 | [LED_ONOFF](LED_ONOFF) | GPIO 레지스터(RCC, MODER, OSPEEDR, ODR)를 직접 건드려 LD2 LED On/Off |
-| [LED_ON_OFF_Res](LED_ON_OFF_Res) | LED On/Off 실습 관련 프로젝트 |
-| [LED_Switch](LED_Switch) | 스위치(버튼) 입력을 받아 LED 제어 |
+| [LED_ON_OFF_Res](LED_ON_OFF_Res) | GPIO/RCC 레지스터 주소를 `#define`과 구조체로 정의하는 연습 (`main()` 없이 정의만 있음) |
+| [LED_Switch](LED_Switch) | 버튼(PC13) 입력을 IDR 폴링으로 읽어 LED(PA5) 제어 |
 | [Clock](Clock) | HSE + PLL로 SYSCLK을 170MHz로 설정 (FLASH wait state, boost 모드 포함) |
 | [LED_Switch_int](LED_Switch_int) | 버튼(PC13) EXTI 인터럽트로 LED(PA5) 토글 (SYSCFG EXTICR, EXTI, NVIC 레지스터 설정) |
 | [ADC](ADC) | PA9(ADC5_IN2) 아날로그 전압을 ADC5 단일 변환(polling)으로 읽어 전압 환산 |
 | [TimerCounter](TimerCounter) | TIM1 업데이트 인터럽트(PSC/ARR)로 1초마다 LED(PA5) 토글 |
 | [STM32G474RE](STM32G474RE) | 바람(chcbaram) "STM32 펌웨어 기초" 시리즈 실습 (HAL 기반, USB CDC 진행 중) |
 
-각 프로젝트의 세부 내용(레지스터 설명, 진행 상황, 남은 작업 등)은 해당 폴더의 `README.md`를 참고.
+각 프로젝트의 세부 내용(레지스터 설명, 진행 상황, 남은 작업 등)은 해당 폴더의 `README.md`를 참고. `LED_ON_OFF_Res`와 `LED_Switch`는 README 없이 소스 주석에 설명이 있다.

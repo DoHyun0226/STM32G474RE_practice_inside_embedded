@@ -3,7 +3,7 @@
  - 해당 프로젝트는 작성자 본인이 STM32G474RE를 이용해 Baram 유튜브 영상을 따라 실습하는 용도이다. 
  - 해당 파일에는 작성자가 유용하다고 생각되는 정보 그냥 형식 없이 작성할꺼다.
 
- 1. 000.h 파일에거 Ctrl + Tap 누르면 000.c로 넘어감
+ 1. 000.h 파일에서 Ctrl + Tab 누르면 000.c로 넘어감
  2. 111.h에서 #include "000.h"에 커서가 있는 상태에서 F3 누르면 000.h 파일로 넘어감
 
  
@@ -33,19 +33,21 @@ CubeMX가 "이상 없음"으로 통과시킨 이유: `HSE_VALUE=8000000`이라�
 
 ## 남은 작업 (다음에 이어서)
 
+2026-11-03 코드 기준 상태: 주파수 관련 수정(HSE 24MHz, PLLM /6, `HSE_VALUE`)은 완료. **남은 것은 HSE BYPASS 설정, CRS 활성화.** 배선(4번)은 코드로 확인할 수 없는 항목이다.
+
 **1. CubeMX `.ioc`**
-- Pinout & Configuration → System Core → RCC → High Speed Clock (HSE) → `BYPASS Clock Source`
+- (미완료) Pinout & Configuration → System Core → RCC → High Speed Clock (HSE) → `BYPASS Clock Source`
   (제대로 되면 핀아웃에서 PF1/OSC_OUT이 회색으로 풀림)
-- Clock Configuration → HSE Input frequency `8` → `24`
-- Clock Configuration → PLLM `/2` → `/6`
+- (완료) Clock Configuration → HSE Input frequency `8` → `24`
+- (완료) Clock Configuration → PLLM `/2` → `/6`
 - 확인: SYSCLK 170 / HCLK 170 / To USB 48 → `24 ÷6 = 4 ×85 = 340 ÷2 = 170`
 
 **2. 생성된 코드를 손으로 옮기기** (빌드에 쓰이는 건 `src/bsp/` 쪽, `cube_g474/Core/`는 빌드 제외)
-- `cube_g474/Core/Src/main.c`의 `SystemClock_Config()` → `src/bsp/bsp.c`
-- `HSE_VALUE`를 `24000000UL`로 → `src/bsp/stm32g4xx_hal_conf.h` 118번 줄
+- (PLLM까지 완료, BYPASS 설정 후 `HSEState`를 다시 옮겨야 함. 지금은 양쪽 다 `RCC_HSE_ON`) `cube_g474/Core/Src/main.c`의 `SystemClock_Config()` → `src/bsp/bsp.c`
+- (완료) `HSE_VALUE`를 `24000000UL`로 → `src/bsp/stm32g4xx_hal_conf.h` 118번 줄
   (안 고치면 `SystemCoreClock`이 56.67MHz로 계산되어 `HAL_Delay`가 3배 느려짐. 에러 없이 조용히 틀림)
 
-**3. CRS 활성화** — `.ioc`에서 `To CRS`가 회색. HSI48은 RC라 USB 규격 오차에 아슬아슬하므로 CRS로 SOF 동기 보정 필요. 없으면 인식/끊김 반복하거나 보드가 따뜻해지면 끊김
+**3. CRS 활성화 (미완료)** — `.ioc`에서 `To CRS`가 회색. HSI48은 RC라 USB 규격 오차에 아슬아슬하므로 CRS로 SOF 동기 보정 필요. 없으면 인식/끊김 반복하거나 보드가 따뜻해지면 끊김
 
 **4. PA11/PA12 물리 배선** — Nucleo의 USB 단자는 ST-LINK 전용. 모르포 헤더에서 PA11(DM)/PA12(DP)/GND를 USB 브레이크아웃으로 빼야 함. VBUS는 불필요(ST-LINK 케이블로 급전)
 

@@ -48,6 +48,12 @@ HAL_UART_Transmit(&huart1, &i, 1, 100);  // 핸들 주소, 데이터 주소, 개
 - `Size`는 보낼 데이터 개수. 한 데이터가 몇 비트인지는 `huart1.Init`에 이미 있다. 문자열 길이는 `sizeof` 대신 `strlen`을 쓴다(`sizeof`는 끝의 `'\0'`까지 셈).
 - 9600bps에서 1바이트(시작 1 + 데이터 8 + 정지 1 = 10비트)는 약 1.04ms 걸린다. 타임아웃은 이보다 넉넉하게 잡는다.
 
+## 실험 기록
+
+- 영상: [STM32 UART Bluetooth Transmit Test (HAL, NUCLEO-G474RE)](https://www.youtube.com/watch?v=bu-3NrXJ_uU)
+
+레지스터로 만든 버전은 [UART](../UART) 참고.
+
 ## 참고
 
 자주 쓰는 HAL 함수 정리(함수 원형, 레지스터 대응, 콜백)는 별도 PDF로 정리해 두었다(저장소 밖, `05_MCU_자료/STM/STM32G4_HAL_함수_정리.pdf`).

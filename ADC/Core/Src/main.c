@@ -146,15 +146,15 @@ int main(void)
 	ADC5->CR |=  (0x1UL<<28);                       // ADVREGEN = 1 (내부 레귤레이터 ON)
     for (volatile uint32_t i = 0; i < 4000; i++);   // tADCVREG_STUP ≥ 20 µs 대기
 
-    ADC5->CR &= ~(0x1UL<<30);                       // ADCALDIF = 0 (single-ended 캘리브레이션)
-	ADC5->CR |=  (0x1UL<<31);                       // ADCAL = 1
-	while (ADC5->CR & (0x1UL<<31));                 // 캘리브레이션 완료 대기
+    ADC5->CR &= ~(0x1UL<<30);                       // ADCALDIF = 0 (single-ended 캘리브레이션, differential input 캘리브레이션은 ADCALDIF = 1을 쓴다.)
+	ADC5->CR |=  (0x1UL<<31);                       // ADCAL = 1 (calibration 시작, ADC가 disable되어 있을 때만 시행됨-->ADEN = 0, calibration이 끝나면 hardware가 clear한다)
+	while (ADC5->CR & (0x1UL<<31));                 // 캘리브레이션 완료 대기(calibration이 끝나면 ADCAL이 clear된다)
 	for (volatile uint32_t i = 0; i < 100; i++);    // ADCAL 후 4 ADC 클록 동안 ADEN 금지
 
 	ADC5->CR |= 0x1UL;         // ADEN: ADC enable control
 	while ((ADC5->ISR & 0x1UL) == 0);               // ADRDY 대기
 
-    ADC5->SMPR1 |= (0x03 << 6);      // SMP2 = 011
+    ADC5->SMPR1 |= (0x03 << 6);      // SMP2 = 011, T(conversion) = Sampling time(RM0440 p610 참고) + 12.5 ADC clock cycles
     ADC5->SQR1  = ((ADC5->SQR1 & ~(0x1FUL<<6)) | 0x2UL<<6);       // SQ1 = 채널2, 채널 1개만 사용하므로 L은 reset 값에서 건들지 않음
 
 /* --------------------------- 메인 루프 -------------------------- */

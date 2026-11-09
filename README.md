@@ -18,6 +18,8 @@ Nucleo-G474RE 보드로 STM32 레지스터/HAL을 실습하는 저장소이다. 
 | [LED_Switch_int](LED_Switch_int) | 버튼(PC13) EXTI 인터럽트로 LED(PA5) 토글 (SYSCFG EXTICR, EXTI, NVIC 레지스터 설정) |
 | [ADC](ADC) | PA9(ADC5_IN2) 아날로그 전압을 ADC5 단일 변환(polling)으로 읽어 전압 환산 |
 | [TimerCounter](TimerCounter) | TIM1 업데이트 인터럽트(PSC/ARR)로 1초마다 LED(PA5) 토글 |
+| [UART](UART) | USART1(PC4/PC5, 9600bps) 레지스터 설정, 블루투스 모듈(BT04-A)로 PC와 에코 통신 |
+| [UART_HAL](UART_HAL) | UART와 같은 설정을 CubeMX + HAL로 구현, A~Z a~z 반복 송신 (`usart.c`에 HAL 함수 위치·레지스터 대응 주석) |
 | [STM32G474RE](STM32G474RE) | 바람(chcbaram) "STM32 펌웨어 기초" 시리즈 실습 (HAL 기반, USB CDC 진행 중) |
 
 각 프로젝트의 세부 내용(레지스터 설명, 진행 상황, 남은 작업 등)은 해당 폴더의 `README.md`를 참고. `LED_ON_OFF_Res`와 `LED_Switch`는 README 없이 소스 주석에 설명이 있다.

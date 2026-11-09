@@ -60,4 +60,9 @@ USART1 커널 클록은 리셋 기본값(`RCC->CCIPR` USART1SEL = 00)인 PCLK2 =
 - Enter(CR, 0x0D)를 치면 0x0E(Shift Out)가 돌아와서 Tera Term이 문자 세트를 바꾼다. 이후 소문자가 그리스 문자(α, β, …)로 보인다.
   Ctrl+N(0x0E)을 보내면 0x0F(Shift In)가 돌아와서 원래대로 돌아오고, Tera Term 메뉴 **제어 → 터미널 초기화**로도 되돌릴 수 있다.
 
+## 실험 기록
+
+- 영상: [Bare-Metal UART over Bluetooth: STM32G474 Echo Test](https://www.youtube.com/watch?v=fqBYanhFH0w)
+- 사진: [실험_사진](실험_사진) 폴더 (배선, 블루투스 모듈)
+
 같은 동작을 HAL로 만든 버전은 [UART_HAL](../UART_HAL) 참고.

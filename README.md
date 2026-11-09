@@ -23,3 +23,5 @@ Nucleo-G474RE 보드로 STM32 레지스터/HAL을 실습하는 저장소이다. 
 | [STM32G474RE](STM32G474RE) | 바람(chcbaram) "STM32 펌웨어 기초" 시리즈 실습 (HAL 기반, USB CDC 진행 중) |
 
 각 프로젝트의 세부 내용(레지스터 설명, 진행 상황, 남은 작업 등)은 해당 폴더의 `README.md`를 참고. `LED_ON_OFF_Res`와 `LED_Switch`는 README 없이 소스 주석에 설명이 있다.
+
+이후 라인트레이서에 쓰는 실습(TCRT5000 2채널 ADC + DMA 등, HAL 기반)은 [Line_Tracer](https://github.com/DoHyun0226/Line_Tracer) 저장소의 `Project_code`에서 이어서 진행한다.
